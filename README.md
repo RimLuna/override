@@ -398,6 +398,7 @@ KEY = X XOR Y
 
 in the end
 ```
+stupid-string XOR (0x1337d00d - input) = stupid-string XOR 0x12 = "Congratulations!"
 0x1337d00d - input = 0x12
 input = 0x1337d00d - 0x12 = 0x1337CFFB = 322424827
 ```
