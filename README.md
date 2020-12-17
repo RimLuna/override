@@ -4,7 +4,7 @@ road to getting kicked out continues
 **here we fucking go, pwn?**
 
 The issue with this shit is that it's too fucking fun and tempting.
-##level 00
+## level 00
 A little binary asking for a password, very fucking original.
 
 This shit asks for a password with scanf, the stores it and compares it to **0x149c**
