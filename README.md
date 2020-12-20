@@ -441,3 +441,17 @@ then compares return of ptrace with 0xb ???
 if it is equal to 0xb, it outputs "No exec() for you" and kills child
 
 so 0xb is for exec() ?
+
+**flag**
+```
+level00@OverRide:~$ su level05
+Password:3v8QLcN5SAhPaZZfEasfmXdwyR59ktDEMAwHF3aN
+```
+## level05
+the binary uses printf, do format string?
+
+binary reads input into a 100 character buffer
+```
+0x08048466 <+34>:    mov    DWORD PTR [esp+0x4],0x64
+```
+then checks if each character is lowercase if it isn't it does a XOR character with 0x20, so I guess we cant inject shellcode
